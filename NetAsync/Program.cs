@@ -1,5 +1,5 @@
 ﻿
 using NetAsync;
 
-TaskMethods.Start();
+await SynchronizationMethods.SemaphoreSlim();
 Console.ReadLine();
