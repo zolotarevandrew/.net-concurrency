@@ -75,4 +75,164 @@ public class SynchronizationMethods
 
 
     }
+
+
+    public static void ManualResetEvent()
+    {
+        // 1) реализует idisposable
+        //создает ядерный объект "событие" через CreateEvent
+        ManualResetEvent @event = new(false);
+        
+        //вызывает NtWaitForSingleObject(), ожидая, пока событие будет установлено Set()
+        @event.WaitOne();
+
+        //вызывает SetEvent(), переводя объект в сигнальное состояние
+        //Все потоки выходят из WaitOne(), потому что ManualResetEvent не сбрасывается автоматически
+        @event.Set();
+        
+        //сбрасывает объект, заставляя WaitOne() снова блокироваться
+        @event.Reset();
+    }
+    
+    public static void AutoResetEvent()
+    {
+        // 1) реализует idisposable
+        //создает ядерный объект "событие" через CreateEvent
+        AutoResetEvent @event = new(false);
+        
+        //вызывает NtWaitForSingleObject(), ожидая, пока событие будет установлено Set()
+        @event.WaitOne();
+
+        //вызывает SetEvent(), переводя объект в сигнальное состояние
+        //разблокирует один поток и сбрасывается автоматически
+        @event.Set();
+        
+        //Reset не нужен, сбрасывается сам
+        //@event.Reset();
+    }
+    
+    public static void ManualResetEventSlim()
+    {
+        // Использовать для разблокирования всех потоков, которые ждали в определенном месте.
+        // 1) реализует idisposable
+        ManualResetEventSlim @event = new(false);
+        
+        /*
+         сначала крутится в SpinWait цикле и ждет
+         поток становится в очередь ожидания Monitor.Wait внутри Lock-a и еще в цикле
+        */
+        @event.Wait();
+
+        //вызывает Monitor.PulseAll если более 1 ожидающего потока
+        @event.Set();
+        
+        //ставит isset в false
+        @event.Reset();
+    }
+    
+    public static void CountDown()
+    {
+        // Использовать для ожидания завершения N потоков, например
+        // 1) реализует idisposable
+        // ManualResetEventSlim внутри
+        CountdownEvent @event = new(5);
+        
+        /*
+         вызываем ManualResetEventSlim Wait
+        */
+        @event.Wait();
+
+        // через Interlocked уменьшаем счетчик, и если 0 то вызываем Set у ManualResetSlim-а, чтобы Wait освободилось
+        @event.Signal();
+        
+    }
+    
+    public static void SpinLockMethods()
+    {
+        // Использовать для коротких ожиданий без переключения контекста потока 10-100 тактов.
+        SpinLock _spinLock = new();
+        
+        bool lockTaken = false;
+            /*
+             1) пытается захватить через CompareExсhange
+             2) если блокировка свободна еще раз пытается захватить через CompareExсhange
+             3) если уже есть ожидающие потоки увеличиваем счетчик
+             4) в цикле пытаемся сделать CAS
+             */
+        _spinLock.Enter(ref lockTaken);
+        try
+        {
+            // Короткий критический код
+            Console.WriteLine($"[{Thread.CurrentThread.ManagedThreadId}] Обновление данных...");
+        }
+        finally
+        {
+            //interlocked decrement или exchange
+            if (lockTaken) _spinLock.Exit();
+        }
+        
+    }
+    
+    public static void ReaderWriterLock()
+    {
+        // Реализует idisposable
+        using ReaderWriterLockSlim lck = new();
+        
+        /*
+         * при создании устанавливается уникальный _lockID - есть статический s_nextLockID (сначала он 0) и при создании инстанса он увеличивает на 1 каждый раз.
+         * то есть у каждого ReaderWriterLockSlim уникальный _lockId.
+         * При EnterReadLock
+         * 
+         * 1) если id текущего потока равен id читателя кидаем exception
+         * 2) Пытаемся зайти в spinwait lock
+         * через Interlocked.CompareExchange(ref _isLocked, 1, 0) == 0
+         * внутри не использует Sleep(1), а только Sleep(0), и SpinWait,  потому что может привести к latency в reader/writer lock операциях
+         *
+         * Получаем ReaderWriterCount - связанный список в котором у каждого потока указана нужное количество необходимое для получения лока по _lockId.
+         * ReaderWriterCount ThreadStatic - уникален для каждого потока, чтобы не создавать блокировки.
+         * Крутимся в цикле
+         * - максимальное количество ридеров MAX_READERS - 268435454 (0x10000000 - 2), если _owner < MAX_READERS, то можем войти в блокировку, увеличиваем кол-во овнеров
+         * и кол-во readercount у ReaderWriterCount
+         * - если таймаут исчерпался выходим
+         * - проверяем имеет ли смысл крутиться в цикле дальше и при необходимости меняем ReaderWriterCount, поскольку могла произойти смена потоков
+         * - создаем EventWaitHandle и ждем Set пока не освободят
+         *
+         * При ExitReadLock в простом случае
+         * - заходим в spinlock
+         * - освобождаем spinlock
+         */
+        lck.EnterReadLock();
+        try
+        {
+            Console.WriteLine($"Reader");
+        }
+        finally
+        {
+            lck.ExitReadLock();
+        }
+        Thread.Sleep(1000);
+        
+    }
+
+    public void SpinWait()
+    {
+        SpinWait spinWait = new SpinWait();
+        /*
+         * Сначала ждет активно (SpinWait).
+        Если ожидание долгое, уступает управление (Thread.Yield()).
+        Если ожидание слишком долгое, засыпает (Thread.Sleep(0) / Thread.Sleep(1)).
+         */
+        spinWait.SpinOnce();
+    }
+    
+    public void Lazy()
+    {
+        Lazy<string> lazyValue = new Lazy<string>(() =>
+        {
+            Console.WriteLine("Объект создается...");
+            return "Hello, Lazy!";
+        });
+        var res = lazyValue.Value;
+
+    }
 }
