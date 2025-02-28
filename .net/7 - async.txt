@@ -1,0 +1,25 @@
+Concurrency - doing more than one thing at a time.
+Multithreading - form of concurrency that uses multiple threads.
+Parallel processing - doing lots of work by diving it up multiple threads that run concurrently.
+Async programming - form of concurrency that uses futures or callbacks;
+Reactive programming - declarative style of programming while the application reacts to events.
+
+Async programming улучшает масштабируемость за счет освобождения потоков.
+
+Data parallelism - есть банч элементов для обработки и процессинг каждой части независимо от других.
+Task parallelism - есть пул работы для обработки,  и каждая часть работы независима друг от друга.
+Tasks - Сaptured variables в замыканиях, быть осторожными, потому что они хранят ссылку на объект.
+
+ThreadPool имеет глобальную очередь и каждый поток пула имеет свою очередь.
+Когда поток пула добавляет делегат в очередь он сначала идет в очередь потока.
+максимизирует хиты кэша.
+Если другой тред не имеет работы, он steal украдет делегат у другого потока.
+
+
+ValutTask - Используется в случаях, когда асинхронный метод может иногда завершаться синхронно. 
+- Избегает лишних аллокаций Task<T> при синхронном завершении метода.
+- Эффективен в библиотеках, где важна производительность
+
+
+https://dev.to/noseratio/asynchronous-coroutines-with-c-8-0-and-iasyncenumerable-2e04
+
